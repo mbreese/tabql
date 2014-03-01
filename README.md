@@ -35,3 +35,8 @@ You can also pipe data into tabql
 
 ## License
 BSD - three clause
+
+## Similar projects
+
+* Q - https://github.com/harelba/q (Python, GPL)
+* TextQL - https://github.com/dinedal/textql (Go)
