@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 '''
 tabql - an interface linking tab-delimited text files (or CSV?) and SQLite.
 '''
@@ -38,64 +37,12 @@ import sqlite3
 import tempfile
 
 
-def usage(msg=None):
-    if msg:
-        sys.stderr.write('ERROR: %s\n' % msg)
-
-    sys.stdout.write(__doc__)
-    sys.stdout.write('''\
-
-Usage: tabql {opts} {db files} SQL-QUERY
-
-Database file definition:
-    -tab {table-name:}filename.txt
-    -csv {table-name:}filename.csv (Planned for future)
-
-    In either case, the given file will be available to query by the given
-    table name. By default, the tables will be named tbl1, tbl2, etc... As
-    a special case, if there is only one input file, it will be named 'tbl'.
-    You can mix and match -tab and -csv.
-
-    Each column will be named c1, c2, c3, etc... if the file is missing a
-    header (configured below). Column types will be auto-determined by
-    SQLite.
-
-    stdin may be used as an input if the filename is set as '-' (default if
-    no -tab or -csv option is given). Note: stdin may not be used if -i is
-    set.
-
-    Source files may also be gzip compressed.
-
-Options:
-    -db filename.db    Use filename.db as the name of the SQLite database. If
-                       this option is used, the temporary DB will NOT be
-                       deleted on exit. If you set the filename to be
-                       ':memory:', then the DB will be kept entirely in RAM.
-                       (default: use a temporary file that is deleted on exit)
-
-    -noheader          The file has no header
-
-    -headercomment     The header is the last commented line
-
-    -i                 Start an interactive SQLite session
-                       (default if no query is given)
-
-    -t tmpdir          Store the temporary DB file in tmpdir
-                       (default: $TMPDIR or /tmp)
-
-    -f                 Force overwriting an existing file
-''')
-
-    sys.exit(1)
-
-
 class TabQL(object):
-    def __init__(self, fnames, dbfname=None, noheader=False, headercomment=False, interactive=False, tmpdir=None, verbose=False):
+    def __init__(self, fnames, dbfname=None, noheader=False, headercomment=False, tmpdir=None, verbose=False):
         self.fnames = fnames
 
         self.noheader = noheader
         self.headercomment = headercomment
-        self.interactive = interactive
         self.verbose = verbose
 
         if tmpdir == None:
@@ -128,11 +75,11 @@ class TabQL(object):
             sys.stderr.flush()
 
     def __setup(self):
-        for i, (file_type, fname) in enumerate(fnames):
+        for i, (file_type, fname) in enumerate(self.fnames):
             if ':' in fname:
                 tablename, fname = fname.split(':', 1)
             else:
-                if len(fnames) > 1:
+                if len(self.fnames) > 1:
                     tablename = 'tbl%s' % i
                 else:
                     tablename = 'tbl'
@@ -307,82 +254,3 @@ class TabReader(object):
                 for header, val in zip(self.headers, cols):
                     d[header] = val
                 yield d
-
-
-if __name__ == '__main__':
-    fnames = []
-    dbfname = None
-    noheader = False
-    headercomment = False
-    interactive = False
-    tmpdir = None
-    force = False
-    verbose = False
-    query = []
-
-    last = None
-
-    for arg in sys.argv[1:]:
-        if last == '-tab' or last == '-csv':
-            if os.path.exists(os.path.expanduser(arg.split(':', 1)[-1])) or arg.split(':', 1)[-1] == '-':
-                fnames.append((last, arg))
-            else:
-                usage("Missing input file: %s" % arg)
-
-            last = None
-        elif last == '-db':
-            dbfname = os.path.expanduser(arg)
-            last = None
-        elif last == '-t':
-            if not os.path.isdir(arg):
-                usage("Invalid temporary directory: %s" % arg)
-            tmpdir = arg
-            last = None
-        elif arg == '-h':
-            usage()
-        elif arg == '-f':
-            force = True
-        elif arg == '-headercomment':
-            headercomment = True
-        elif arg == '-noheader':
-            noheader = True
-        elif arg == '-i':
-            interactive = True
-        elif arg == '-v':
-            verbose = True
-        elif arg in ['-db', '-tab' ,'-t', '-csv']:
-            last = arg
-        else:
-            query.append(arg)
-
-    if dbfname and os.path.exists(dbfname):
-        if not force:
-            usage("Database file: %s already exists!" % arg)
-        else:
-            os.unlink(dbfname)
-
-
-    if not fnames:
-        fnames.append(('-tab', '-'))
-
-    for ftype, fname in fnames:
-        if fname == '-' and interactive:
-            usage("Interactive mode can not be used when the data is read from stdin")
-
-    tabql = TabQL(fnames, dbfname, noheader, headercomment, interactive, tmpdir, verbose)
-
-    if query:
-        header = False
-        for cursor, row in tabql.execute(' '.join(query)):
-            if not header:
-                sys.stdout.write('%s\n' % '\t'.join([x[0] for x in cursor.description]))
-                header = True
-
-            sys.stdout.write('%s\n' % '\t'.join([str(x) for x in row]))
-
-
-    if interactive:
-        # subprocess doesn't work right when opening sqlite3
-        os.system('sqlite3 %s' % tabql.dbfname)
-
-    tabql.close()
