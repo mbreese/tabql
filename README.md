@@ -1,4 +1,4 @@
-tabql - Use SQLite to help work with tab-delimited text files.
+tabql - Use SQLite to work with tab-delimited text files.
 =====
 
 SQL is a powerful tool for data analysis, however, it requires setting up
